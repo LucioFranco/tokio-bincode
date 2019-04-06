@@ -20,7 +20,7 @@ struct MyProtocol;
 // Create the codec based on your custom protocol
 let codec = BinCodec::<MyProtocol>::new();
 
-// Frame the codec to produce a stream/sink
+// Frame the transport with the codec to produce a stream/sink
 let (sink, stream) = Framed::new(transport, codec).split();
 ```
 
