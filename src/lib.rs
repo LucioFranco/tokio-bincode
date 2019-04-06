@@ -84,7 +84,7 @@ where
 
     fn encode(&mut self, item: T, buf: &mut BytesMut) -> Result<(), Self::Error> {
         let size = self.config.serialized_size(&item)?;
-        buf.reserve(size as usize + 1);
+        buf.reserve(size as usize);
         let message = self.config.serialize(&item)?;
         buf.put(&message[..]);
         Ok(())
