@@ -103,8 +103,8 @@ struct Reader<'buf> {
     amount: usize,
 }
 
-impl<'a> Reader<'a> {
-    pub fn new(buf: &'a [u8]) -> Self {
+impl<'buf> Reader<'buf> {
+    pub fn new(buf: &'buf [u8]) -> Self {
         Reader { buf, amount: 0 }
     }
 
