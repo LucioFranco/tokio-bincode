@@ -1,6 +1,6 @@
 # tokio-bincode
 
-[![Build Status](https://dev.azure.com/luciofranco0489/luciofranco/_apis/build/status/LucioFranco.tokio-bincode?branchName=master)](https://dev.azure.com/luciofranco0489/luciofranco/_build/latest?definitionId=1&branchName=master)
+[![Build Status](https://dev.azure.com/luciofranco0489/luciofranco/_apis/build/status/LucioFranco.tokio-bincode?branchName=master)](https://dev.azure.com/luciofranco0489/luciofranco/_build/latest?definitionId=1&branchName=master) ![Crates.io](https://img.shields.io/crates/v/tokio-bincode.svg) ![Crates.io](https://img.shields.io/crates/l/tokio-bincode.svg) ![Docs.rs](https://docs.rs/tokio-bincode/badge.svg)
 
 Bincode based `tokio-codec` adapter.
 
