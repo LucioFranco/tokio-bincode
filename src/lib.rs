@@ -113,8 +113,8 @@ impl<'a> Reader<'a> {
     }
 }
 
-impl<'buf> Read for &mut Reader<'buf> {
-    fn read<'a>(&'a mut self, buf: &mut [u8]) -> io::Result<usize> {
+impl<'buf, 'a> Read for &'a mut Reader<'buf> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let bytes_read = self.buf.read(buf)?;
         self.amount += bytes_read;
         Ok(bytes_read)
