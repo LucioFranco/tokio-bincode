@@ -1,5 +1,7 @@
 # tokio-bincode
 
+[![Build Status](https://dev.azure.com/luciofranco0489/luciofranco/_apis/build/status/LucioFranco.tokio-bincode?branchName=master)](https://dev.azure.com/luciofranco0489/luciofranco/_build/latest?definitionId=1&branchName=master)
+
 Bincode based `tokio-codec` adapter.
 
 ## Usage
