@@ -11,10 +11,13 @@ keywords = ["networking", "bincode", "futures"]
 categories = ["network-programming", "asynchronous"]
 edition = "2018"
 
+[features]
+big_data = []
+
 [dependencies]
 bytes = "0.4"
 bincode = "1.0"
-tokio-codec = "0.1"
+tokio = "0.1"
 serde = "1.0"
 
 [dev-dependencies]
