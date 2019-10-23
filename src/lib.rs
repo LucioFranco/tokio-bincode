@@ -58,16 +58,27 @@ pub struct BinCodec<T> {
 
 impl<T> BinCodec<T> {
     /// Provides a bincode based codec
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     /// Provides a bincode based codec from the bincode config
     #[cfg(not(feature = "big_data"))]
-    pub fn with_config(config: Config) -> Self { BinCodec { config, _pd: PhantomData } }
+    pub fn with_config(config: Config) -> Self {
+        BinCodec {
+            config,
+            _pd: PhantomData,
+        }
+    }
 
     /// Provides a bincode based codec from the bincode config and a `LengthDelimitedCodec` builder
     #[cfg(feature = "big_data")]
     pub fn with_config(config: Config, builder: &mut Builder) -> Self {
-        BinCodec { lower: builder.new_codec(), config, _pd: PhantomData }
+        BinCodec {
+            lower: builder.new_codec(),
+            config,
+            _pd: PhantomData,
+        }
     }
 }
 
@@ -139,7 +150,9 @@ where
 }
 
 impl<T> fmt::Debug for BinCodec<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { f.debug_struct("BinCodec").finish() }
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("BinCodec").finish()
+    }
 }
 
 #[cfg(not(feature = "big_data"))]
@@ -153,9 +166,13 @@ mod reader {
     }
 
     impl<'buf> Reader<'buf> {
-        pub fn new(buf: &'buf [u8]) -> Self { Reader { buf, amount: 0 } }
+        pub fn new(buf: &'buf [u8]) -> Self {
+            Reader { buf, amount: 0 }
+        }
 
-        pub fn amount(&self) -> usize { self.amount }
+        pub fn amount(&self) -> usize {
+            self.amount
+        }
     }
 
     impl<'buf, 'a> Read for &'a mut Reader<'buf> {
@@ -179,7 +196,6 @@ mod tests {
         net::{TcpListener, TcpStream},
         runtime::current_thread,
     };
-
 
     fn start_server<T>(addr: SocketAddr) -> JoinHandle<()>
     where
