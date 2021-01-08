@@ -16,7 +16,7 @@
 //! struct MyProtocol;
 //!
 //! // Create the codec based on your custom protocol
-//! let codec = BinCodec::<MyProtocol, _>::new();
+//! let codec = BinCodec::<MyProtocol>::new();
 //!
 //! // Frame the transport with the codec to produce a stream/sink
 //! let (sink, stream) = Framed::new(transport, codec).split();
@@ -48,21 +48,29 @@ use tokio_util::codec::length_delimited::{Builder, LengthDelimitedCodec};
 ///
 /// Optionally depends on [`LengthDelimitedCodec`](https://docs.rs/tokio/0.1/tokio/codec/length_delimited/struct.LengthDelimitedCodec.html)
 /// when `big_data` feature is enabled
-pub struct BinCodec<T, O> {
+pub struct BinCodecWithOptions<T, O> {
     #[cfg(feature = "big_data")]
     lower: LengthDelimitedCodec,
     config: O,
     _pd: PhantomData<T>,
 }
 
-impl<T> BinCodec<T, DefaultOptions> {
-    /// Provides a bincode based codec
+/// BinCodec with DefaultOptions
+pub type BinCodec<T> = BinCodecWithOptions<T, DefaultOptions>;
+
+impl<T> BinCodec<T> {
+    /// Provides a bincode based codec with default options
     pub fn new() -> Self {
         Self::default()
     }
 }
 
-impl<T, O> BinCodec<T, O> {
+/// Creates a new BinCodec with the default options
+pub fn new<T>() -> BinCodec<T> {
+    Default::default()
+}
+
+impl<T, O> BinCodecWithOptions<T, O> {
     /// Provides a bincode based codec from the bincode config
     #[cfg(not(feature = "big_data"))]
     pub fn with_config(config: O) -> Self {
@@ -75,7 +83,7 @@ impl<T, O> BinCodec<T, O> {
     /// Provides a bincode based codec from the bincode config and a `LengthDelimitedCodec` builder
     #[cfg(feature = "big_data")]
     pub fn with_config(config: O, builder: &mut Builder) -> Self {
-        BinCodec {
+        BinCodecWithOptions {
             lower: builder.new_codec(),
             config,
             _pd: PhantomData,
@@ -83,11 +91,11 @@ impl<T, O> BinCodec<T, O> {
     }
 }
 
-impl<T> Default for BinCodec<T, DefaultOptions> {
+impl<T> Default for BinCodec<T> {
     #[inline]
     fn default() -> Self {
         let config = bincode::options();
-        BinCodec::with_config(
+        BinCodecWithOptions::with_config(
             config,
             #[cfg(feature = "big_data")]
             &mut Builder::new(),
@@ -95,7 +103,7 @@ impl<T> Default for BinCodec<T, DefaultOptions> {
     }
 }
 
-impl<T, O> Decoder for BinCodec<T, O>
+impl<T, O> Decoder for BinCodecWithOptions<T, O>
 where
     for<'de> T: Deserialize<'de>,
     O: Options + Clone,
@@ -127,7 +135,7 @@ where
     }
 }
 
-impl<T, O> Encoder<T> for BinCodec<T, O>
+impl<T, O> Encoder<T> for BinCodecWithOptions<T, O>
 where
     T: Serialize,
     O: Options + Clone,
@@ -152,7 +160,7 @@ where
     }
 }
 
-impl<T, O> fmt::Debug for BinCodec<T, O> {
+impl<T, O> fmt::Debug for BinCodecWithOptions<T, O> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("BinCodec").finish()
     }
@@ -204,8 +212,8 @@ mod tests {
         }
 
         let (send, recv) = UnixStream::pair().expect("couldn't get unix stream");
-        let recv = FramedRead::new(recv, BinCodec::<Mock, _>::new());
-        let mut send = FramedWrite::new(send, BinCodec::<Mock, _>::new());
+        let recv = FramedRead::new(recv, BinCodec::<Mock>::new());
+        let mut send = FramedWrite::new(send, BinCodec::<Mock>::new());
         futures::pin_mut!(recv);
 
         send.send(Mock::One)
@@ -241,8 +249,8 @@ mod tests {
         }
 
         let (send, recv) = UnixStream::pair().expect("couldn't get unix stream");
-        let recv = FramedRead::new(recv, BinCodec::<Mock, _>::new());
-        let mut send = FramedWrite::new(send, BinCodec::<Mock, _>::new());
+        let recv = FramedRead::new(recv, BinCodec::<Mock>::new());
+        let mut send = FramedWrite::new(send, BinCodec::<Mock>::new());
         futures::pin_mut!(recv);
 
         let data = Mock::Two;
