@@ -6,18 +6,17 @@
 //! # Example
 //!
 //! ```
-//! # use futures::{Stream, Sink};
+//! # use futures::{StreamExt};
 //! # use tokio::io::{AsyncRead, AsyncWrite};
-//! # use tokio::codec::Framed;
+//! # use tokio_util::codec::Framed;
 //! # use serde::{Serialize, Deserialize};
 //! # use tokio_bincode::BinCodec;
-//! # use serde_derive::{Serialize, Deserialize};
 //! # fn sd<'a>(transport: impl AsyncRead + AsyncWrite) {
 //! #[derive(Serialize, Deserialize)]
 //! struct MyProtocol;
 //!
 //! // Create the codec based on your custom protocol
-//! let codec = BinCodec::<MyProtocol>::new();
+//! let codec = BinCodec::<MyProtocol, _>::new();
 //!
 //! // Frame the transport with the codec to produce a stream/sink
 //! let (sink, stream) = Framed::new(transport, codec).split();
@@ -34,14 +33,14 @@
 
 #![deny(missing_docs, missing_debug_implementations)]
 
-use bincode::Config;
+use bincode::{DefaultOptions, Options};
 use bytes::BytesMut;
 use serde::{Deserialize, Serialize};
 use std::{fmt, marker::PhantomData};
-use tokio::codec::{Decoder, Encoder};
+use tokio_util::codec::{Decoder, Encoder};
 
 #[cfg(feature = "big_data")]
-use tokio::codec::length_delimited::{Builder, LengthDelimitedCodec};
+use tokio_util::codec::length_delimited::{Builder, LengthDelimitedCodec};
 
 /// Bincode based codec for use with `tokio-codec`
 ///
@@ -49,22 +48,24 @@ use tokio::codec::length_delimited::{Builder, LengthDelimitedCodec};
 ///
 /// Optionally depends on [`LengthDelimitedCodec`](https://docs.rs/tokio/0.1/tokio/codec/length_delimited/struct.LengthDelimitedCodec.html)
 /// when `big_data` feature is enabled
-pub struct BinCodec<T> {
+pub struct BinCodec<T, O> {
     #[cfg(feature = "big_data")]
     lower: LengthDelimitedCodec,
-    config: Config,
+    config: O,
     _pd: PhantomData<T>,
 }
 
-impl<T> BinCodec<T> {
+impl<T> BinCodec<T, DefaultOptions> {
     /// Provides a bincode based codec
     pub fn new() -> Self {
         Self::default()
     }
+}
 
+impl<T, O> BinCodec<T, O> {
     /// Provides a bincode based codec from the bincode config
     #[cfg(not(feature = "big_data"))]
-    pub fn with_config(config: Config) -> Self {
+    pub fn with_config(config: O) -> Self {
         BinCodec {
             config,
             _pd: PhantomData,
@@ -73,7 +74,7 @@ impl<T> BinCodec<T> {
 
     /// Provides a bincode based codec from the bincode config and a `LengthDelimitedCodec` builder
     #[cfg(feature = "big_data")]
-    pub fn with_config(config: Config, builder: &mut Builder) -> Self {
+    pub fn with_config(config: O, builder: &mut Builder) -> Self {
         BinCodec {
             lower: builder.new_codec(),
             config,
@@ -82,10 +83,10 @@ impl<T> BinCodec<T> {
     }
 }
 
-impl<T> Default for BinCodec<T> {
+impl<T> Default for BinCodec<T, DefaultOptions> {
     #[inline]
     fn default() -> Self {
-        let config = bincode::config();
+        let config = bincode::options();
         BinCodec::with_config(
             config,
             #[cfg(feature = "big_data")]
@@ -94,9 +95,10 @@ impl<T> Default for BinCodec<T> {
     }
 }
 
-impl<T> Decoder for BinCodec<T>
+impl<T, O> Decoder for BinCodec<T, O>
 where
     for<'de> T: Deserialize<'de>,
+    O: Options + Clone,
 {
     type Error = bincode::Error;
     type Item = T;
@@ -104,7 +106,7 @@ where
     #[cfg(feature = "big_data")]
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         Ok(if let Some(buf) = self.lower.decode(src)? {
-            Some(self.config.deserialize(&buf)?)
+            Some(self.config.clone().deserialize(&buf)?)
         } else {
             None
         })
@@ -112,11 +114,12 @@ where
 
     #[cfg(not(feature = "big_data"))]
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        use bytes::Buf;
         if !buf.is_empty() {
             let mut reader = reader::Reader::new(&buf[..]);
-            let message = self.config.deserialize_from(&mut reader)?;
+            let message = self.config.clone().deserialize_from(&mut reader)?;
             let amount = reader.amount();
-            buf.split_to(amount);
+            buf.advance(amount);
             Ok(Some(message))
         } else {
             Ok(None)
@@ -124,16 +127,16 @@ where
     }
 }
 
-impl<T> Encoder for BinCodec<T>
+impl<T, O> Encoder<T> for BinCodec<T, O>
 where
     T: Serialize,
+    O: Options + Clone,
 {
     type Error = bincode::Error;
-    type Item = T;
 
     #[cfg(feature = "big_data")]
     fn encode(&mut self, item: T, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        let bytes = self.config.serialize(&item)?;
+        let bytes = self.config.clone().serialize(&item)?;
         self.lower.encode(bytes.into(), dst)?;
         Ok(())
     }
@@ -141,15 +144,15 @@ where
     #[cfg(not(feature = "big_data"))]
     fn encode(&mut self, item: T, buf: &mut BytesMut) -> Result<(), Self::Error> {
         use bytes::BufMut;
-        let size = self.config.serialized_size(&item)?;
+        let size = self.config.clone().serialized_size(&item)?;
         buf.reserve(size as usize);
-        let message = self.config.serialize(&item)?;
+        let message = self.config.clone().serialize(&item)?;
         buf.put(&message[..]);
         Ok(())
     }
 }
 
-impl<T> fmt::Debug for BinCodec<T> {
+impl<T, O> fmt::Debug for BinCodec<T, O> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("BinCodec").finish()
     }
@@ -157,7 +160,7 @@ impl<T> fmt::Debug for BinCodec<T> {
 
 #[cfg(not(feature = "big_data"))]
 mod reader {
-    use tokio::{io, prelude::Read};
+    use std::io::{self, Read};
 
     #[derive(Debug)]
     pub struct Reader<'buf> {
@@ -187,107 +190,89 @@ mod reader {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures::{Future, Sink, Stream};
+    use futures::{SinkExt, TryStreamExt};
     use serde::{Deserialize, Serialize};
-    use serde_derive::{Deserialize, Serialize};
-    use std::{net::SocketAddr, thread::JoinHandle};
-    use tokio::{
-        codec::Framed,
-        net::{TcpListener, TcpStream},
-        runtime::current_thread,
-    };
+    use tokio::net::UnixStream;
+    use tokio_util::codec::{FramedRead, FramedWrite};
 
-    fn start_server<T>(addr: SocketAddr) -> JoinHandle<()>
-    where
-        T: Serialize + 'static + for<'de> Deserialize<'de>,
-    {
-        let echo = TcpListener::bind(&addr).unwrap();
-
-        std::thread::spawn(move || {
-            current_thread::run(
-                echo.incoming()
-                    .map_err(bincode::Error::from)
-                    .take(1)
-                    .for_each(|stream| {
-                        let (w, r) = Framed::new(stream, BinCodec::<T>::new()).split();
-                        r.forward(w).map(|_| ())
-                    })
-                    .map_err(|_| ()),
-            )
-        })
-    }
-
-    #[test]
-    fn it_works() {
+    #[tokio::test]
+    async fn it_works() {
         #[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
         enum Mock {
             One,
             Two,
         }
 
-        let addr = SocketAddr::new("127.0.0.1".parse().unwrap(), 15151);
-        let jh = start_server::<Mock>(addr);
+        let (send, recv) = UnixStream::pair().expect("couldn't get unix stream");
+        let recv = FramedRead::new(recv, BinCodec::<Mock, _>::new());
+        let mut send = FramedWrite::new(send, BinCodec::<Mock, _>::new());
+        futures::pin_mut!(recv);
 
-        let client = TcpStream::connect(&addr).wait().unwrap();
-        let client = Framed::new(client, BinCodec::<Mock>::new());
+        send.send(Mock::One)
+            .await
+            .expect("could not send message 1 to server");
 
-        let client = client.send(Mock::One).wait().unwrap();
-
-        let (got, client) = match client.into_future().wait() {
+        let got = match recv.try_next().await {
             Ok(x) => x,
-            Err((e, _)) => panic!("[Mock::One]> Error during deserialize: {:?}", e),
+            Err(e) => panic!("[Mock::One]> Error during deserialize: {:?}", e),
         };
 
         assert_eq!(got, Some(Mock::One));
 
-        let client = client.send(Mock::Two).wait().unwrap();
+        send.send(Mock::Two)
+            .await
+            .expect("could not send message 2 to server");
 
-        let (got, client) = match client.into_future().wait() {
+        let got = match recv.try_next().await {
             Ok(x) => x,
-            Err((e, _)) => panic!("[Mock::Two]> Error during deserialize: {:?}", e),
+            Err(e) => panic!("[Mock::Two]> Error during deserialize: {:?}", e),
         };
 
         assert_eq!(got, Some(Mock::Two));
-
-        drop(client);
-        jh.join().unwrap();
     }
 
-    #[test]
     #[cfg(feature = "big_data")]
-    fn big_data() {
+    #[tokio::test]
+    async fn big_data() {
         #[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
         enum Mock {
             One(Vec<u8>),
             Two,
         }
 
-        let addr = SocketAddr::new("127.0.0.1".parse().unwrap(), 15152);
-        let jh = start_server::<Mock>(addr);
-
-        let client = TcpStream::connect(&addr).wait().unwrap();
-        let client = Framed::new(client, BinCodec::<Mock>::new());
-        let data = Mock::One(vec![0; 1_000_000]);
-        let client = client.send(data.clone()).wait().unwrap();
-
-        let (got, client) = match client.into_future().wait() {
-            Ok(x) => x,
-            Err((e, _)) => panic!("[Mock::One]> Error during deserialize: {:?}", e),
-        };
-
-        assert_eq!(got, Some(data));
+        let (send, recv) = UnixStream::pair().expect("couldn't get unix stream");
+        let recv = FramedRead::new(recv, BinCodec::<Mock, _>::new());
+        let mut send = FramedWrite::new(send, BinCodec::<Mock, _>::new());
+        futures::pin_mut!(recv);
 
         let data = Mock::Two;
-        let client = client.send(data.clone()).wait().unwrap();
+        send.send(data.clone())
+            .await
+            .expect("could not send message 2 to server");
 
-        let (got, client) = match client.into_future().wait() {
+        let got = match recv.try_next().await {
             Ok(x) => x,
-            Err((e, _)) => panic!("[Mock::Two]> Error during deserialize: {:?}", e),
+            Err(e) => panic!("[Mock::Two]> Error during deserialize: {:?}", e),
         };
 
         assert_eq!(got, Some(data));
 
-        drop(client);
-        jh.join().unwrap();
+        let data = Mock::One(vec![0; 1024 * 1_024 + 1]);
+        let task = {
+            let data = data.clone();
+            async move {
+                send.send(data)
+                    .await
+                    .expect("could not send message 1 to server");
+            }
+        };
+        let _ = tokio::spawn(task);
+
+        let got = match recv.try_next().await {
+            Ok(x) => x,
+            Err(e) => panic!("[Mock::One]> Error during deserialize: {:?}", e),
+        };
+
+        assert_eq!(got, Some(data));
     }
 }
