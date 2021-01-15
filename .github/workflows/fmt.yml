@@ -1,0 +1,26 @@
+name: Format
+
+on: [push, pull_request]
+
+jobs:
+  check-fmt:
+    runs-on: [self-hosted, rust]
+    steps:
+    # checkout branch
+    - uses: actions/checkout@v2
+
+    #install toolchain
+    - name: Install 2020-08-22 nightly (rust 1.47)
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: nightly-2020-08-23
+        profile: minimal
+        override: true
+        components: rustfmt
+
+    #run formatting
+    - name: Check formatting
+      uses: actions-rs/cargo@v1
+      with:
+        command: fmt
+        args: --all -- --check

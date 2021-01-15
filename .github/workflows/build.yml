@@ -1,0 +1,36 @@
+name: Check
+
+on: [push, pull_request]
+
+jobs:
+  check:
+    runs-on: [self-hosted, rust]
+    steps:
+    # checkout branch
+    - uses: actions/checkout@v2
+
+    #install toolchain
+    - name: Install 2020-08-22 nightly (rust 1.47)
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: nightly-2020-08-23
+        profile: minimal
+        override: true
+        components: rustfmt
+
+    #cache build artifacts
+    - uses: actions/cache@v2
+      with:
+        path: |
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+    #build
+    - name: Build
+      uses: actions-rs/cargo@v1
+      env:
+        CARGO_INCREMENTAL: 0
+        RUSTFLAGS: "-C debuginfo=0 -D warnings"
+      with:
+        command: check
