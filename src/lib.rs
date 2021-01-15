@@ -60,34 +60,21 @@ pub type BinCodec<T> = BinCodecWithOptions<T, DefaultOptions>;
 
 impl<T> BinCodec<T> {
     /// Provides a bincode based codec with default options
-    pub fn new() -> Self {
-        Self::default()
-    }
+    pub fn new() -> Self { Self::default() }
 }
 
 /// Creates a new BinCodec with the default options
-pub fn new<T>() -> BinCodec<T> {
-    Default::default()
-}
+pub fn new<T>() -> BinCodec<T> { Default::default() }
 
 impl<T, O> BinCodecWithOptions<T, O> {
     /// Provides a bincode based codec from the bincode config
     #[cfg(not(feature = "big_data"))]
-    pub fn with_config(config: O) -> Self {
-        BinCodec {
-            config,
-            _pd: PhantomData,
-        }
-    }
+    pub fn with_config(config: O) -> Self { BinCodec { config, _pd: PhantomData } }
 
     /// Provides a bincode based codec from the bincode config and a `LengthDelimitedCodec` builder
     #[cfg(feature = "big_data")]
     pub fn with_config(config: O, builder: &mut Builder) -> Self {
-        BinCodecWithOptions {
-            lower: builder.new_codec(),
-            config,
-            _pd: PhantomData,
-        }
+        BinCodecWithOptions { lower: builder.new_codec(), config, _pd: PhantomData }
     }
 }
 
@@ -161,9 +148,7 @@ where
 }
 
 impl<T, O> fmt::Debug for BinCodecWithOptions<T, O> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("BinCodec").finish()
-    }
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { f.debug_struct("BinCodec").finish() }
 }
 
 #[cfg(not(feature = "big_data"))]
@@ -177,13 +162,9 @@ mod reader {
     }
 
     impl<'buf> Reader<'buf> {
-        pub fn new(buf: &'buf [u8]) -> Self {
-            Reader { buf, amount: 0 }
-        }
+        pub fn new(buf: &'buf [u8]) -> Self { Reader { buf, amount: 0 } }
 
-        pub fn amount(&self) -> usize {
-            self.amount
-        }
+        pub fn amount(&self) -> usize { self.amount }
     }
 
     impl<'buf, 'a> Read for &'a mut Reader<'buf> {
@@ -216,9 +197,7 @@ mod tests {
         let mut send = FramedWrite::new(send, BinCodec::<Mock>::new());
         futures::pin_mut!(recv);
 
-        send.send(Mock::One)
-            .await
-            .expect("could not send message 1 to server");
+        send.send(Mock::One).await.expect("could not send message 1 to server");
 
         let got = match recv.try_next().await {
             Ok(x) => x,
@@ -227,9 +206,7 @@ mod tests {
 
         assert_eq!(got, Some(Mock::One));
 
-        send.send(Mock::Two)
-            .await
-            .expect("could not send message 2 to server");
+        send.send(Mock::Two).await.expect("could not send message 2 to server");
 
         let got = match recv.try_next().await {
             Ok(x) => x,
@@ -254,9 +231,7 @@ mod tests {
         futures::pin_mut!(recv);
 
         let data = Mock::Two;
-        send.send(data.clone())
-            .await
-            .expect("could not send message 2 to server");
+        send.send(data.clone()).await.expect("could not send message 2 to server");
 
         let got = match recv.try_next().await {
             Ok(x) => x,
@@ -269,9 +244,7 @@ mod tests {
         let task = {
             let data = data.clone();
             async move {
-                send.send(data)
-                    .await
-                    .expect("could not send message 1 to server");
+                send.send(data).await.expect("could not send message 1 to server");
             }
         };
         let _ = tokio::spawn(task);
